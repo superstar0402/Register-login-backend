@@ -32,7 +32,6 @@ userSchema.pre('save', async function(next) {
     next();
 });
 
-
 // Method to check password validity
 userSchema.methods.isValidPassword = async function(password) {
     return await bcrypt.compare(password, this.password);
