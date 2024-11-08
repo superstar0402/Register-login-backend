@@ -1,27 +1,26 @@
-const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../config/config');
-const User = require('../models/User');
+const passport = require('passport');
 
-const protect = async (req, res, next) => {
-    try {
-        const token = req.headers.authorization?.split(' ')[1];
-        
-        if (!token) {
-            return res.status(401).json({ message: 'Authentication required' });
+const protect = (req, res, next) => {
+    passport.authenticate('jwt', { session: false }, (err, user, info) => {
+        if (err) {
+            return res.status(500).json({ message: 'Internal server error' });
         }
-
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await User.findById(decoded.id).select('-password');
         
         if (!user) {
-            return res.status(401).json({ message: 'User not found' });
+            return res.status(401).json({ message: 'Authentication required' });
         }
-
+        
         req.user = user;
         next();
-    } catch (error) {
-        res.status(401).json({ message: 'Invalid token' });
-    }
+    })(req, res, next);
 };
 
 module.exports = { protect };
+
+
+
+
+
+
+
+

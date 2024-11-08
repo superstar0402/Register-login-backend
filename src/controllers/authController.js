@@ -1,3 +1,4 @@
+const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { JWT_SECRET, JWT_EXPIRE } = require('../config/config');
@@ -19,6 +20,7 @@ exports.register = async (req, res) => {
             username,
             email,
             password
+           
         });
 
         const token = generateToken(user._id);
@@ -30,6 +32,7 @@ exports.register = async (req, res) => {
                 id: user._id,
                 username: user.username,
                 email: user.email
+           
             }
         });
     } catch (error) {
@@ -37,18 +40,14 @@ exports.register = async (req, res) => {
     }
 };
 
-exports.login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+exports.login = (req, res, next) => {
+    passport.authenticate('local', { session: false }, (err, user, info) => {
+        if (err) {
+            return res.status(500).json({ message: 'Server error' });
         }
-
-        const isMatch = await user.isValidPassword(password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+        
+        if (!user) {
+            return res.status(401).json({ message: info.message });
         }
 
         const token = generateToken(user._id);
@@ -62,47 +61,36 @@ exports.login = async (req, res) => {
                 email: user.email
             }
         });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
+    })(req, res, next);
 };
 
-exports.getMe = async (req, res) => {
-    res.json({
-        success: true,
-        user: req.user
-    });
-};
-
-// Add this new controller function to the existing authController.js
-exports.loginWithToken = async (req, res) => {
-    try {
-        const token = req.headers.authorization?.split(' ')[1];
+exports.loginWithToken = (req, res, next) => {
+    passport.authenticate('jwt', { session: false }, (err, user, info) => {
+        if (err) {
+            return res.status(500).json({ message: 'Server error' });
+        }
         
-        if (!token) {
-            return res.status(401).json({ message: 'Token is required' });
-        }
-
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await User.findById(decoded.id).select('-password');
-
         if (!user) {
-            return res.status(401).json({ message: 'User not found' });
+            return res.status(401).json({ message: 'Invalid or expired token' });
         }
 
-        // Generate a new token
-        const newToken = generateToken(user._id);
+        const token = generateToken(user._id);
 
         res.json({
             success: true,
-            token: newToken,
+            token,
             user: {
                 id: user._id,
                 username: user.username,
                 email: user.email
             }
         });
-    } catch (error) {
-        res.status(401).json({ message: 'Invalid or expired token' });
-    }
+    })(req, res, next);
+};
+
+exports.getMe = (req, res) => {
+    res.json({
+        success: true,
+        user: req.user
+    });
 };
